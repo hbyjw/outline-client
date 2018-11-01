@@ -350,13 +350,8 @@ public class VpnTunnelService extends VpnService {
     @Override
     public void onAvailable(Network network) {
       NetworkInfo networkInfo = connectivityManager.getNetworkInfo(network);
-      NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
-      LOG.fine(String.format(Locale.ROOT, "Network available: %s\nActive network: %s", networkInfo,
-          activeNetworkInfo));
-      if (networkInfo == null || !networkEquals(networkInfo, activeNetworkInfo)) {
-        return;
-      } else if (activeNetworkInfo != null
-          && activeNetworkInfo.getState() != NetworkInfo.State.CONNECTED) {
+      LOG.fine(String.format(Locale.ROOT, "Network available: %s", networkInfo));
+      if (networkInfo == null || networkInfo.getState() != NetworkInfo.State.CONNECTED) {
         return;
       }
       broadcastVpnConnectivityChange(OutlinePlugin.ConnectionStatus.CONNECTED);
@@ -364,6 +359,11 @@ public class VpnTunnelService extends VpnService {
 
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
         // Indicate that traffic will be sent over the current active network.
+        // Although setting the underlying network to an available network may not seem like the
+        // correct behavior, this method has been observed only to fire only when a preferred
+        // network becomes available. It will not fire, for example, when the mobile network becomes
+        // available if WiFi is the active network. Additionally, `getActiveNetwork` and
+        // `getActiveNetworkInfo` have been observed to return the underlying network set by us.
         setUnderlyingNetworks(new Network[] {network});
       }
     }
@@ -383,19 +383,6 @@ public class VpnTunnelService extends VpnService {
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
         setUnderlyingNetworks(null);
       }
-    }
-
-    // Returns whether the underlying networks of NetworkInfo objects are equal.
-    // NetworkInfo.equals performs identity comparison, which is not useful in this context.
-    private boolean networkEquals(final NetworkInfo a, final NetworkInfo b) {
-      if (a == null || b == null) {
-        return false;
-      }
-      final String aExtraInfo = a.getExtraInfo();
-      final String bExtraInfo = b.getExtraInfo();
-      boolean extraInfoIsEqual = aExtraInfo == null ? bExtraInfo == null
-                                                    : aExtraInfo.equals(bExtraInfo);
-      return extraInfoIsEqual && a.getType() == b.getType() && a.getState() == b.getState();
     }
   }
 
@@ -530,7 +517,7 @@ public class VpnTunnelService extends VpnService {
       builder = new Notification.Builder(this);
     }
     try {
-      builder.setSmallIcon(getResourceIdForDrawable("small_icon"));
+      builder.setSmallIcon(getResourceId("small_icon", "drawable"));
     } catch (Exception e) {
       LOG.warning("Failed to retrieve the resource ID for the notification icon.");
     }
@@ -558,9 +545,9 @@ public class VpnTunnelService extends VpnService {
     }
   }
 
-  /* Gets the resource id for the given drawable. */
-  private int getResourceIdForDrawable(final String drawableId) throws Exception {
-    return getResources().getIdentifier(drawableId, "drawable", getPackageName());
+  /* Retrieves the ID for a resource. This is equivalent to using the generated R class. */
+  public int getResourceId(final String name, final String type) {
+    return getResources().getIdentifier(name, type, getPackageName());
   }
 
   /* Returns the server's name from |serverConfig|. If the name is not present, it falls back to the
@@ -586,12 +573,12 @@ public class VpnTunnelService extends VpnService {
   }
 
   /* Retrieves a localized string by id from the application's resources. */
-  private String getStringResource(final String resourceId) {
+  private String getStringResource(final String name) {
     String resource = "";
     try {
-      resource = getString(getResources().getIdentifier(resourceId, "string", getPackageName()));
+      resource = getString(getResourceId(name, "string"));
     } catch (Exception e) {
-      LOG.warning(String.format(Locale.ROOT, "Failed to retrieve string resource: %s", resourceId));
+      LOG.warning(String.format(Locale.ROOT, "Failed to retrieve string resource: %s", name));
     }
     return resource;
   }

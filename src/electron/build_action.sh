@@ -14,11 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Compile the Electron-specific code.
+yarn do src/www/build
+
 tsc -p src/electron
 
-# Build the web app (renderer process).
-yarn do src/www/build
 rsync -ac www/ build/electron/renderer
 
 # Version info and Sentry config.
